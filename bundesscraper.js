@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-
+/* ABC */
 /* all the listeners! (trust me, it's gonna be ok) */
 process.setMaxListeners(0);
 
@@ -95,6 +95,7 @@ var name_translations = {
 var fetch = {};
 
 fetch.bt = function(_callback){
+	console.log( 'fetch.bt () Start' );
 	var data = [];
 	var base_url = "http://www.bundestag.de/bundestag/abgeordnete18/alphabet/index.html";
 	scraper.scrape({
@@ -103,11 +104,16 @@ fetch.bt = function(_callback){
 		encoding: "utf8"
 	}, function(err, $){
 		if (err) {
+			console.log( 'fetch.bt () ERROR' );
 			_callback(err);
 		} else {
+			console.log( 'fetch.bt () SUCCESS' );
 			var _count_fetchable = 0;
 			var _count_fetched = 0;
-			$('.linkIntern a','#inhaltsbereich').each(function(idx, e){
+
+			var linksFound = $('.linkIntern a','#inhaltsbereich');
+			console.log( 'fetch.bt () Found ' + linksFound.length + ' internal links in #inhaltsbereich' );
+			linksFound.each(function(idx, e){
 				var $e = $(this);
 				/* check for dead or retired members, marked by "+)" or "*)" and for "Jakob Maria Mierscheid" */
 				if (!($e.text().match(/[\*\+]\)$/)) && !($(this).text().match(/Mierscheid/i))) {
@@ -128,10 +134,12 @@ fetch.bt = function(_callback){
 						url: _data.url,
 						type: "html",
 						encoding: "utf8"
-					}, function(err, $){
+					}, function(err, $){						
 						if (err) {
+							console.log( 'fetch.bt () Fetch ERROR: ' + _data.url );
 							if (argv.v) console.log("[fail]".inverse.bold.red, "fetching".white, _data.url.red);
 						} else {
+							console.log( 'fetch.bt () Fetch SUCCESS: ' + _data.url );
 							/* name, fraktion */
 							var _title = $('h1', '#inhaltsbereich').eq(0).text().replace(/^\s+|\s+$/,'').split(', ');
 							_data.name = _title[0].replace(/ \([^\)]+\)$/,'');
@@ -303,6 +311,22 @@ fetch.bt = function(_callback){
 								break;
 							}
 							
+
+							console.log( 'fetch.bt () Scraped Member "' + adr_search_firstname+' '+adr_search_surname + '":' );
+							//console.log( _data );
+
+
+_data.nachname = adr_search_surname;
+_data.vorname = adr_search_firstname;
+
+							data.push(_data);
+
+							_count_fetched++;
+							if (_count_fetched === _count_fetchable) {
+								_callback(null, data);
+							}
+
+/*
 							//hmpf
 
 							scraper.scrape({
@@ -322,17 +346,19 @@ fetch.bt = function(_callback){
 								_count_fetched++;
 
 								if (err) {
-									if (argv.v) console.log("[fail]".inverse.bold.red, "address".white, adr_search_firstname.red, adr_search_surname.red);
+									console.log( 'fetch.bt () AddessSearch ERROR: "' + adr_search_firstname+' '+adr_search_surname + '":' );
+									if (argv.v) console.log("[fail]".inverse.bold.red, "address1".white, adr_search_firstname.red, adr_search_surname.red);
 								} else {
-									
+									console.log( 'fetch.bt () AddessSearch SUCCESS: "' + adr_search_firstname+' '+adr_search_surname + '":' );
 									if ($('.infoBox .standardBox table.standard','#container').length < 1) {
-										
-										if (argv.v) console.log("[fail]".inverse.bold.red, "address".white, adr_search_firstname.red, adr_search_surname.red);
+// HIER RUTSCHT ER REIN. IM BROWSER GEHT ES ABER. WARUM?
+										console.log( 'fetch.bt () AddessSearch SUCCESS - Container not Found : "' + adr_search_firstname+' '+adr_search_surname + '":' );
+										if (argv.v) console.log("[fail]".inverse.bold.red, "address2".white, adr_search_firstname.red, adr_search_surname.red);
 										
 									} else {
 										
 										$('.infoBox .standardBox table.standard tr','#container').each(function(idx,e){
-											
+											console.log( 'fetch.bt () AddessSearch SUCCESS - Container Row Found : "' + adr_search_firstname+' '+adr_search_surname + '":' );
 											switch ($(this).find('th').text().replace(/^\s+|\s+$/g,'')) {
 												
 												case "Nachname": 
@@ -364,10 +390,12 @@ fetch.bt = function(_callback){
 									
 								}
 							});
+*/
 						}
 
 					});
 				} 
+				console.log( 'fetch.bt () Do not fetch beause of wrong name: ' + $e.text() );
 			});
 		}
 	});
@@ -1313,6 +1341,7 @@ fetch.frak_cducsu = function(_callback){
 								});
 							break;
 							default:
+								dbg('OUTPUT DEFAULT HTML Fallback')
 								console.log($(this).attr("class"), $(this).html());
 								process.exit();
 							break;
@@ -1358,6 +1387,9 @@ fetch.frak_cducsu = function(_callback){
 }
 
 var fetch_all = function(_callback) {
+
+	dbg('fetch_all()');
+
 	var _passed = 0;
 	var _data = {
 		bt: null,
@@ -1369,14 +1401,24 @@ var fetch_all = function(_callback) {
 		frak_cducsu: null
 	};
 	
-	["bt","wp","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
+	//["bt","wp","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
+	["bt"].forEach(function(_fetch){		
 		if (argv.v) console.log('[init]'.magenta.inverse.bold, "scraper".cyan, _fetch.white);
+		
 		fetch[_fetch](function(err, data){
 			_passed++;
 			if (argv.v) console.log(((err)?'[fail]'.red:'[ ok ]'.green).inverse.bold, "scraper".cyan, _fetch.white);
-			if (!err) _data[_fetch] = data;
-			if (_passed === 7) _callback(null, _data);
+			if (!err) {
+				_data[_fetch] = data;
+				dbg('fetch_' + _fetch + 'callback ( SUCCESS ):');
+				//console.log(_data);
+			} else {
+				dbg('fetch_' + _fetch + 'callback ( ERROR )');
+			}
+			//if (_passed === 7) _callback(null, _data);
+			if (_passed === 1) _callback(null, _data);
 		});
+		
 	});
 };
 
@@ -1424,102 +1466,114 @@ var data_combine = function(_data, _callback){
 	});
 	
 	/* find abgeordnetenwatch */
-	for (var i = 0; i < _data.agw.length; i++) {
-		var _found = false;
-		var _name = name_simplify(_data.agw[i].name)
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0)) {
-				var _found = true;
-				data[j].data.agw = _data.agw[i];
-				break;
+	if (_data.agw) {
+		for (var i = 0; i < _data.agw.length; i++) {
+			var _found = false;
+			var _name = name_simplify(_data.agw[i].name)
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0)) {
+					var _found = true;
+					data[j].data.agw = _data.agw[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Abgeordnetenwatch)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Abgeordnetenwatch)'.cyan);
 	}
 
 	/* find wikipedia */
-	for (var i = 0; i < _data.wp.length; i++) {
-		var _found = false;
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_data.wp[i].name) >= 0) || (data[j].compare.name.indexOf(name_translations[_data.wp[i].name]) >= 0)) {
-				var _found = true;
-				data[j].data.wp = _data.wp[i];
-				break;
+	if (_data.wp) {
+		for (var i = 0; i < _data.wp.length; i++) {
+			var _found = false;
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_data.wp[i].name) >= 0) || (data[j].compare.name.indexOf(name_translations[_data.wp[i].name]) >= 0)) {
+					var _found = true;
+					data[j].data.wp = _data.wp[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _data.wp[i].name.white, '(Wikipedia)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _data.wp[i].name.white, '(Wikipedia)'.cyan);
 	}
 	
 	/* find spd */
-	for (var i = 0; i < _data.frak_spd.length; i++) {
-		var _name = name_simplify(_data.frak_spd[i].name)
-		var _found = false;
-		var _kontakt = [];
-		_data.frak_spd[i].kontakt.forEach(function(_k){
-			if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
-		});
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
-				var _found = true;
-				data[j].data.frak_spd = _data.frak_spd[i];
-				break;
+	if (_data.frak_spd) {
+		for (var i = 0; i < _data.frak_spd.length; i++) {
+			var _name = name_simplify(_data.frak_spd[i].name)
+			var _found = false;
+			var _kontakt = [];
+			_data.frak_spd[i].kontakt.forEach(function(_k){
+				if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
+			});
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
+					var _found = true;
+					data[j].data.frak_spd = _data.frak_spd[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion SPD)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion SPD)'.cyan);
 	}
 
 	/* find grüne */
-	for (var i = 0; i < _data.frak_gruene.length; i++) {
-		var _name = name_simplify(_data.frak_gruene[i].name)
-		var _found = false;
-		var _kontakt = [];
-		_data.frak_gruene[i].kontakt.forEach(function(_k){
-			if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
-		});
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
-				var _found = true;
-				data[j].data.frak_gruene = _data.frak_gruene[i];
-				break;
+	if (_data.frak_gruene) {
+		for (var i = 0; i < _data.frak_gruene.length; i++) {
+			var _name = name_simplify(_data.frak_gruene[i].name)
+			var _found = false;
+			var _kontakt = [];
+			_data.frak_gruene[i].kontakt.forEach(function(_k){
+				if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
+			});
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
+					var _found = true;
+					data[j].data.frak_gruene = _data.frak_gruene[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion Grüne)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion Grüne)'.cyan);
 	}
 	
 	/* find linke */
-	for (var i = 0; i < _data.frak_linke.length; i++) {
-		var _name = name_simplify(_data.frak_linke[i].name)
-		var _found = false;
-		var _kontakt = [];
-		_data.frak_linke[i].kontakt.forEach(function(_k){
-			if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
-		});
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
-				var _found = true;
-				data[j].data.frak_linke = _data.frak_linke[i];
-				break;
+	if (_data.frak_linke) {
+		for (var i = 0; i < _data.frak_linke.length; i++) {
+			var _name = name_simplify(_data.frak_linke[i].name)
+			var _found = false;
+			var _kontakt = [];
+			_data.frak_linke[i].kontakt.forEach(function(_k){
+				if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
+			});
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
+					var _found = true;
+					data[j].data.frak_linke = _data.frak_linke[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion Linke)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion Linke)'.cyan);
 	}
 
 	/* find cdu/csu */
-	for (var i = 0; i < _data.frak_cducsu.length; i++) {
-		var _name = name_simplify(_data.frak_cducsu[i].name)
-		var _found = false;
-		var _kontakt = [];
-		_data.frak_cducsu[i].kontakt.forEach(function(_k){
-			if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
-		});
-		for (var j = 0; j < data.length; j++) {
-			if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
-				var _found = true;
-				data[j].data.frak_cducsu = _data.frak_cducsu[i];
-				break;
+	if (_data.frak_cducsu) {
+		for (var i = 0; i < _data.frak_cducsu.length; i++) {
+			var _name = name_simplify(_data.frak_cducsu[i].name)
+			var _found = false;
+			var _kontakt = [];
+			_data.frak_cducsu[i].kontakt.forEach(function(_k){
+				if (["phone","email"].indexOf(_k.type) >= 0) _kontakt.push(_k.address)
+			});
+			for (var j = 0; j < data.length; j++) {
+				if ((data[j].compare.name.indexOf(_name) >= 0) || (data[j].compare.name.indexOf(name_translations[_name]) >= 0) || (array_intersect(_kontakt, data[j].compare.kontakt))) {
+					var _found = true;
+					data[j].data.frak_cducsu = _data.frak_cducsu[i];
+					break;
+				}
 			}
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion CDU/CSU)'.cyan);
 		}
-		if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _name.white, '(Fraktion CDU/CSU)'.cyan);
 	}
 
 	_callback(null, data);
@@ -1607,7 +1661,7 @@ var data_unify = function(_data, _callback){
 			if ("wohnort" in item.data.agw && item.data.agw.wohnort !== null) _data.meta.wohnort = item.data.agw.wohnort;
 			
 		} else {
-			if (argv.v) console.log("[warn]".inverse.bold.yellow, "No Data for:".yellow, _data.name.white, '(Abgeordnetenwatch)'.cyan);
+//			if (argv.v) console.log("[warn]".inverse.bold.yellow, "No Data for:".yellow, _data.name.white, '(Abgeordnetenwatch)'.cyan);
 		}
 
 		/* wikipedia */
@@ -1671,7 +1725,7 @@ var data_unify = function(_data, _callback){
 			}
 		
 		} else {
-			if (argv.v) console.log("[warn]".inverse.bold.yellow, "No Data for:".yellow, _data.name.white, '(Wikipedia)'.cyan);
+//			if (argv.v) console.log("[warn]".inverse.bold.yellow, "No Data for:".yellow, _data.name.white, '(Wikipedia)'.cyan);
 		}
 
 		/* spd */
@@ -1850,26 +1904,48 @@ var data_unify = function(_data, _callback){
 };
 
 var load_data = function(_callback) {
+	dbg('load_data() Uncached');
 	var cache_file = path.resolve(__dirname, 'cache.json');
 	if (argv.c && fs.existsSync(cache_file)) {
+		dbg('load_data CACHED !');
 		_callback(null, JSON.parse(fs.readFileSync(cache_file)))
 	} else {
 		fetch_all(function(err, data){
+
+			if (err) {
+				dbg('fetch_all callback ( ERROR )');
+			} else {
+				dbg('fetch_all callback ()');
+			}
+
 			fs.writeFileSync(cache_file, JSON.stringify(data, null, '\t'));
 			_callback(null, data);
 		});
 	}
 }
 
+
+var dbg = function( msg ) {
+	console.log( ('[debug] ' + msg).yellow );
+}
+
 var main = function(){
+	dbg('main()');
 	load_data(function(err, data){
+		
+		if (err) {
+			dbg('load_data callback ( ERROR )');
+		} else {
+			dbg('load_data callback ()');
+		}
+
 		if (argv.v) console.log('[stat]'.magenta.inverse.bold, "all data loaded".white);
 		data_combine(data, function(err, data){
 			data_unify(data, function(err, data){
 				if (argv.v) console.log('[stat]'.magenta.inverse.bold, "all data combined".white);
 
 				var out_file = (argv._.length > 0) ? argv._[0] : 'data.json';
-				if (argv.t) out_file = "bundesscraper."+moment().format("YYYYMMDD")+".json";
+				if (argv.t) out_file = "bundesscraper."+moment().format("YYYY-MM-DD")+".json";
 				if (argv.z) out_file += ".xz";
 				out_file = path.resolve((argv.o || __dirname), out_file);
 
