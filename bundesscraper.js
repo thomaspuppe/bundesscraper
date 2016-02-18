@@ -403,6 +403,8 @@ _data.vorname = adr_search_firstname;
 
 fetch.wp = function(_callback){
 	
+	console.log( 'fetch.WP () Start' );
+
 	var data = [];
 	var base_url = "http://de.wikipedia.org/wiki/Liste_der_Mitglieder_des_Deutschen_Bundestages_%2818._Wahlperiode%29";
 	scraper.scrape({
@@ -412,15 +414,24 @@ fetch.wp = function(_callback){
 	}, function(err, $){
 
 		if (err) {
+			dbg( 'fetch.WP () ERROR' );
+			console.log( error );
 			_callback(err);
 		} else {
+
+			dbg( 'fetch.WP () OK' );
 
 			var _count_fetchable = 0;
 			var _count_fetched = 0;
 
 			var data = [];
 			
-			$('#Abgeordnete').parent().next().next('table.prettytable.sortable').find('tr').each(function(idx,e){
+			var allRows = $('#Abgeordnete').parent().next().next('table.prettytable.sortable').find('tr');
+			dbg( 'fetch.WP () found ' + allRows.length + ' rows.');
+
+			allRows = allRows.slice(0,5);
+
+			allRows.each(function(idx,e){
 
 				if ($(this).find('td').length === 0) return;
 
@@ -442,6 +453,9 @@ fetch.wp = function(_callback){
 					_data.geboren = $(this).find('td').eq(1).text();
 					_data.bundesland = $(this).find('td').eq(3).text();
 
+					dbg( 'fetch.WP () read data for "' + _data.name + '".');
+
+
 					scraper.scrape({
 						url: _data.wp_url, 
 						type: "html",
@@ -451,10 +465,14 @@ fetch.wp = function(_callback){
 						_count_fetched++;
 
 						if (err) {
+							dbg( 'fetch.WP (' + _data.wp_url + ') ERROR' );
+							console.log(err)
 							_callback(err);
 						} else {
-							
-							/* kategorien */
+
+							dbg( 'fetch.WP (' + _data.wp_url + ') OK' );
+
+							// kategorien
 							$('ul li a','#catlinks').each(function(idx,e){
 								switch ($(this).attr("title")) {
 									case "Kategorie:Mann":
@@ -469,7 +487,7 @@ fetch.wp = function(_callback){
 								}
 							});
 							
-							/* weblinks */
+							// weblinks
 							$('#Weblinks').parent().next('ul').find('a').each(function(idx,e){
 								_data.links.push({
 									"text": $(this).text(),
@@ -477,7 +495,7 @@ fetch.wp = function(_callback){
 								});
 							});
 							
-							/* personendaten meta */
+							// personendaten meta
 							$('#Vorlage_Personendaten tr').each(function(idx,e){
 								if ($(this).find('.metadata-label').length === 1) {
 									var _val = ($(this).find('.metadata-label').next().text());
@@ -495,7 +513,7 @@ fetch.wp = function(_callback){
 								}
 							});
 							
-							/* bilder? */
+							// bilder?
 							$('a.image', '#mw-content-text').eq(0).each(function(idx,e){
 								if ($(this).attr('href').match(/\.jp(e)?g$/)) {
 									_data.fotos_links.push(url.resolve(_data.wp_url, $(this).attr('href')));
@@ -507,7 +525,13 @@ fetch.wp = function(_callback){
 						data.push(_data);
 
 						if (_count_fetchable === _count_fetched) {
-							/* get fotos from api */
+
+
+							_callback(null, data);
+							return;
+							// TODO: Fotos. Deren Erfolg darf aber nicht die Callbacks verhindern.
+
+							// get fotos from api
 							
 							var _count_fetchable_fotos = 0;
 							var _count_fetched_fotos = 0;
@@ -537,6 +561,7 @@ fetch.wp = function(_callback){
 							});
 						}
 					});
+
 				}
 			});
 		}
@@ -1402,7 +1427,7 @@ var fetch_all = function(_callback) {
 	};
 	
 	//["bt","wp","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
-	["bt"].forEach(function(_fetch){		
+	["wp"].forEach(function(_fetch){		
 		if (argv.v) console.log('[init]'.magenta.inverse.bold, "scraper".cyan, _fetch.white);
 		
 		fetch[_fetch](function(err, data){
@@ -1446,24 +1471,27 @@ var array_intersect = function(a, b) {
 
 var data_combine = function(_data, _callback){
 	var data = [];
-	_data.bt.forEach(function(d){
-		var _item = {
-			data: {},
-			compare: {
-				name: [],
-				kontakt: []
-			}
-		};
-		_item.data.bt = d;
-		d.aliases.forEach(function(i){
-			_item.compare.name.push(i)
-			_item.compare.name.push(name_simplify(i))
+
+	if (_data.bt) {
+		_data.bt.forEach(function(d){
+			var _item = {
+				data: {},
+				compare: {
+					name: [],
+					kontakt: []
+				}
+			};
+			_item.data.bt = d;
+			d.aliases.forEach(function(i){
+				_item.compare.name.push(i)
+				_item.compare.name.push(name_simplify(i))
+			});
+			d.kontakt.forEach(function(i){
+				if (["phone","email"].indexOf(i.type) >= 0) _item.compare.kontakt.push(i.address);
+			});
+			data.push(_item);
 		});
-		d.kontakt.forEach(function(i){
-			if (["phone","email"].indexOf(i.type) >= 0) _item.compare.kontakt.push(i.address);
-		});
-		data.push(_item);
-	});
+	}
 	
 	/* find abgeordnetenwatch */
 	if (_data.agw) {
@@ -1494,6 +1522,7 @@ var data_combine = function(_data, _callback){
 			}
 			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _data.wp[i].name.white, '(Wikipedia)'.cyan);
 		}
+		//console.log(_data)
 	}
 	
 	/* find spd */
@@ -1917,8 +1946,9 @@ var load_data = function(_callback) {
 			} else {
 				dbg('fetch_all callback ()');
 			}
-
+/* DISABLE I/O
 			fs.writeFileSync(cache_file, JSON.stringify(data, null, '\t'));
+*/
 			_callback(null, data);
 		});
 	}
@@ -1949,6 +1979,7 @@ var main = function(){
 				if (argv.z) out_file += ".xz";
 				out_file = path.resolve((argv.o || __dirname), out_file);
 
+/* DISABLE I/O
 				if (argv.z) {
 					var compressor = new xz.Compressor(9);
 					compressor.pipe(fs.createWriteStream(out_file).on("finish", function(){
@@ -1964,6 +1995,7 @@ var main = function(){
 					if (argv.v) console.log("<3".bold.magenta, 'made with datalove'.magenta);
 					process.exit();
 				}
+*/
 			});
 		});
 	});
