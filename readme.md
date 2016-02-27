@@ -2,6 +2,11 @@
 
 Scraping Data of Members of the German Federal Parliament.
 
+## Current Status: 
+
+Note: This fork is under development/WIP, as I am adapting it to my needs of bundestwitter.de. It works basically, but expect  code to be commented out, paths to be hardcoded and heavy console outout.
+
+
 ## About
 
 Bundesscraper collects data of German Parliament members from several Websites and combines them. The data is collected from
