@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* ABC */
+
 /* all the listeners! (trust me, it's gonna be ok) */
 process.setMaxListeners(0);
 
@@ -23,6 +23,10 @@ var argv = require("optimist")
 	.alias("t","timestamp")
 	.alias("o","outdir")
 	.argv;
+
+var dbg = function( msg ) {
+	console.log( ('[debug] ' + msg).yellow );
+}
 
 /* initialize scrapyard */
 var scraper = new scrapyard({
@@ -96,624 +100,19 @@ var fetch = {};
 
 fetch.bt = function(_callback){
 	console.log( 'fetch.bt () Start' );
-	var data = [];
-	var base_url = "http://www.bundestag.de/bundestag/abgeordnete18/alphabet/index.html";
-	scraper.scrape({
-		url: base_url, 
-		type: "html", 
-		encoding: "utf8"
-	}, function(err, $){
-		if (err) {
-			console.log( 'fetch.bt () ERROR' );
-			_callback(err);
-		} else {
-			console.log( 'fetch.bt () SUCCESS' );
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
 
-			var linksFound = $('.linkIntern a','#inhaltsbereich');
-			console.log( 'fetch.bt () Found ' + linksFound.length + ' internal links in #inhaltsbereich' );
-			linksFound.each(function(idx, e){
-				var $e = $(this);
-				/* check for dead or retired members, marked by "+)" or "*)" and for "Jakob Maria Mierscheid" */
-				if (!($e.text().match(/[\*\+]\)$/)) && !($(this).text().match(/Mierscheid/i))) {
-					_count_fetchable++;
-					var _data = {
-						"name": null,
-						"aliases": [],
-						"url": url.resolve(base_url, $e.attr('href')),
-						"fraktion": null,
-						"fotos": [],
-						"ausschuesse": [],
-						"wahlkreis": null,
-						"mandat": null,
-						"kontakt": [],
-						"web": []
-					};
-					scraper.scrape({
-						url: _data.url,
-						type: "html",
-						encoding: "utf8"
-					}, function(err, $){						
-						if (err) {
-							console.log( 'fetch.bt () Fetch ERROR: ' + _data.url );
-							if (argv.v) console.log("[fail]".inverse.bold.red, "fetching".white, _data.url.red);
-						} else {
-							console.log( 'fetch.bt () Fetch SUCCESS: ' + _data.url );
-							/* name, fraktion */
-							var _title = $('h1', '#inhaltsbereich').eq(0).text().replace(/^\s+|\s+$/,'').split(', ');
-							_data.name = _title[0].replace(/ \([^\)]+\)$/,'');
-							_data.fraktion = _title[1];
-							
-							/* build aliases */
-							_data.aliases.push(_data.name);
-							if (_data.name.match(/^(Prof\. |Dr\. |h\.\s?c\. |rer\. |nat\. |jur\. |iur\. |pol\. )/)) {
-								_data.aliases.push(_data.name.replace(/(Prof\. |Dr\. |h\.\s?c\. |rer\. |nat\. |jur\. |iur\. |pol\. )/g,''));
-							}
-							_data.aliases.forEach(function(name){
-								if (name.match(/\s+[A-Z]\.\s+/)) {
-									_data.aliases.push(name.replace(/\s+[A-Z]\.\s+/,' '));
-								}
-							});
-							
-							/* fotos */
-							$('.bildDivPortrait', '#inhaltsbereich').each(function(idx,e){
-								_data.fotos.push({
-									"url": url.resolve(_data.url, $(this).find('img').attr('src')),
-									"copyright": $(this).find('.bildUnterschrift p').text().replace(/^\s+|\s+$/,'')
-								});
-							});
-
-							/* ausschuesse */
-							$('.mitgliedschaftBox', '#inhaltsbereich').each(function(idx,e){
-								if ($(this).find('h2').eq(0).text().replace(/^\s+|\s+$/,'') === "Mitgliedschaften und Ämter im Bundestag") {
-									$(this).find('.standardBox h3').each(function(idx,f){
-										$(f).next().find('a').each(function(idx,g){
-											_data.ausschuesse.push({
-												"name": $(g).text().replace(/^\s+|\s+$/,''),
-												"funktion": $(f).text().replace(/^\s+|\s+$/,""),
-												"url": url.resolve(_data.url, $(g).attr('href'))
-											});
-										});
-									});
-								}
-							});
-
-							/* website, wahlkreis */
-							$('.contextBox', '#context').each(function(idx,e){
-								var _section = $(this).find('h2').text();
-								switch(_section) {
-									case "Kontakt":
-										if ($(this).find('.standardBox .standardLinkliste .linkExtern a').length > 0) {
-											$(this).find('.standardBox .standardLinkliste .linkExtern a').each(function(idx,f){
-												switch($(f).text()) {
-													case "bei Facebook": 
-														_data.web.push({
-															"service": "facebook",
-															"url": $(f).attr('href')
-														});
-													break;
-													case "bei Twitter": 
-														_data.web.push({
-															"service": "twitter",
-															"url": $(f).attr('href')
-														});
-													break;
-													case "bei studiVZ": 
-														_data.web.push({
-															"service": "studivz",
-															"url": $(f).attr('href')
-														});
-													break;
-													case "bei Xing": 
-														_data.web.push({
-															"service": "studivz",
-															"url": $(f).attr('href')
-														});
-													break;
-													case "Weblog": 
-														_data.web.push({
-															"service": "blog",
-															"url": $(f).attr('href')
-														});
-													break;
-													case "persönliche Internetseite": 
-														_data.web.push({
-															"service": "website",
-															"url": $(f).attr('href')
-														});
-													break;
-													default: 
-														if ($(f).text().match(/^http[s]?:\/\//)) {
-															_data.web.push({
-																"service": "website",
-																"url": $(f).attr('href')
-															});
-														} else {
-															_data.web.push({
-																"service": "unknown",
-																"url": $(f).attr('href')
-															});
-														}
-													break;
-												}
-											});
-										}
-									break;
-									case "Gewählt über Landesliste": 
-										_data.mandat = 'liste';
-										if ($(this).find('.standardBox a[title^=Wahlkreis]','#context').length === 1) {
-											_data.wahlkreis = $(this).find('.standardBox a[title^=Wahlkreis]','#context').eq(0).attr('title');
-										} else {
-											_data.wahlkreis = null;
-										}
-									break;
-									case "Direkt gewählt in": 
-										_data.mandat = 'direkt';
-										_data.wahlkreis = $(this).find('.standardBox a[title^=Wahlkreis]','#context').eq(0).attr('title');
-									break;
-									case "Reden des MdB": break;
-									case "Namentliche Abstimmungen": break;
-									case "Informationen zur Fraktion": break;
-								}
-							});
-							
-							/* get addresses */
-							
-							/* why you no utf8? */
-							var adr_search = (_data.aliases[(_data.aliases.length-1)])
-								.replace(/ä/ig, 'ae')
-								.replace(/ö/ig, 'oe')
-								.replace(/ü/ig, 'ue')
-								.replace(/ß/ig, 'ss')
-								.replace(/ğ/ig, 'g')
-								.replace(/è/ig, 'e')
-								.replace(/é/ig, 'e')
-								.replace(/š/ig, 's')
-								.replace(/ć/ig, 'c')
-								.split(/\s+/);
-							var adr_search_firstname = adr_search.shift();
-							var adr_search_surname = adr_search.pop();
-							
-							/* special cases, fixed by hand. */
-							switch (adr_search_firstname+' '+adr_search_surname) {
-								case "Birgitt Bender":
-									adr_search_firstname = "Biggi";
-									_data.aliases.push("Biggi Bender");
-								break;
-								case "Agnes Brugger":
-									adr_search_firstname = "Agnieszka";
-									_data.aliases.push("Agnieszka Brugger");
-								break;
-								case "Viola Cramon-Taubadel":
-									adr_search_surname = "Cramon";
-									_data.aliases.push("Viola Cramon");
-									_data.aliases.push("Viola von Cramon");
-								break;
-								case "Joerg Essen":
-									adr_search_surname = "Essenvan"; // so broken this shit
-								break;
-								case "Ursula Heinen-Esser":
-									adr_search_surname = "Heinen";
-									_data.aliases.push("Ursula Heinen");
-								break;
-								case "Sven-Christian Kindler":
-									adr_search_firstname = "Sven";
-									_data.aliases.push("Sven Kindler");
-								break;
-								case "Ulla Schmidt":
-									adr_search_firstname = "Ursula";
-									_data.aliases.push("Ursula Schmidt");
-								break;
-								case "Heinz Wichtel":
-									adr_search_firstname = "Peter";
-									_data.aliases.push("Peter Wichtel");
-								break;
-							}
-							
-
-							console.log( 'fetch.bt () Scraped Member "' + adr_search_firstname+' '+adr_search_surname + '":' );
-							//console.log( _data );
-
-
-_data.nachname = adr_search_surname;
-_data.vorname = adr_search_firstname;
-
-							data.push(_data);
-
-							_count_fetched++;
-							if (_count_fetched === _count_fetchable) {
-								_callback(null, data);
-							}
-
-/*
-							//hmpf
-
-							scraper.scrape({
-								url: "http://www.bundestag.de/dokumente/adressbuch/?",
-								type: "html",
-								method: "POST",
-								form: {
-									surname: adr_search_surname,
-									firstname: adr_search_firstname,
-									fraction: "",
-									email: "",
-									associatedTo: "MdB", 
-									doSearch: "Suchen"
-								}
-							}, function(err, $){
-
-								_count_fetched++;
-
-								if (err) {
-									console.log( 'fetch.bt () AddessSearch ERROR: "' + adr_search_firstname+' '+adr_search_surname + '":' );
-									if (argv.v) console.log("[fail]".inverse.bold.red, "address1".white, adr_search_firstname.red, adr_search_surname.red);
-								} else {
-									console.log( 'fetch.bt () AddessSearch SUCCESS: "' + adr_search_firstname+' '+adr_search_surname + '":' );
-									if ($('.infoBox .standardBox table.standard','#container').length < 1) {
-// HIER RUTSCHT ER REIN. IM BROWSER GEHT ES ABER. WARUM?
-										console.log( 'fetch.bt () AddessSearch SUCCESS - Container not Found : "' + adr_search_firstname+' '+adr_search_surname + '":' );
-										if (argv.v) console.log("[fail]".inverse.bold.red, "address2".white, adr_search_firstname.red, adr_search_surname.red);
-										
-									} else {
-										
-										$('.infoBox .standardBox table.standard tr','#container').each(function(idx,e){
-											console.log( 'fetch.bt () AddessSearch SUCCESS - Container Row Found : "' + adr_search_firstname+' '+adr_search_surname + '":' );
-											switch ($(this).find('th').text().replace(/^\s+|\s+$/g,'')) {
-												
-												case "Nachname": 
-													_data.nachname = $(this).find('td').text().replace(/^\s+|\s+$/g,'');
-												break;
-												case "Vorname": 
-													_data.vorname = $(this).find('td').text().replace(/^\s+|\s+$/g,'');
-												break;
-												case "E-Mail Adresse": 
-													_data.kontakt.push({
-														"type": "email",
-														"address": $(this).find('td').text().replace(/^\s+|\s+$/g,'')
-													});
-												break;
-												case "Zertifikat":
-													_data.btcertuid = $(this).find('td a').eq(0).attr('href').split('uid=').pop();
-												break;
-												
-											}
-											
-										});
-										
-									}
-									
-									data.push(_data);
-									if (_count_fetched === _count_fetchable) {
-										_callback(null, data);
-									}
-									
-								}
-							});
-*/
-						}
-
-					});
-				} 
-				console.log( 'fetch.bt () Do not fetch beause of wrong name: ' + $e.text() );
-			});
-		}
-	});
 };
 
-fetch.wp = function(_callback){
-	
-	console.log( 'fetch.WP () Start' );
+var bundestagScraper = require('./modules/scrapers/bundestag');
+fetch.bt = bundestagScraper.fetch;
 
-	var data = [];
-	var base_url = "http://de.wikipedia.org/wiki/Liste_der_Mitglieder_des_Deutschen_Bundestages_%2818._Wahlperiode%29";
-	scraper.scrape({
-		url: base_url, 
-		type: "html",
-		encoding: "utf8"
-	}, function(err, $){
+var wikipediaScraper = require('./modules/scrapers/wikipedia');
+fetch.wp = wikipediaScraper.fetch;
 
-		if (err) {
-			dbg( 'fetch.WP () ERROR' );
-			console.log( error );
-			_callback(err);
-		} else {
-
-			dbg( 'fetch.WP () OK' );
-
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
-
-			var data = [];
-			
-			var allRows = $('#Abgeordnete').parent().next().next('table.prettytable.sortable').find('tr');
-			dbg( 'fetch.WP () found ' + allRows.length + ' rows.');
-
-			allRows = allRows.slice(0,5);
-
-			allRows.each(function(idx,e){
-
-				if ($(this).find('td').length === 0) return;
-
-				if (!($(this).find('td').eq(6).text().match(/ausgeschieden|verstorben/))) {
-					
-					_count_fetchable++;
-					
-					var _data = {
-						"gender": "u",
-						"links": [],
-						"aliases": [],
-						"geburtsdatum": null,
-						"geburtsort": null,
-						"fotos": [],
-						"fotos_links": []
-					};
-					_data.name = $(this).find('td').eq(0).find('a').text();
-					_data.wp_url = url.resolve(base_url, $(this).find('td').eq(0).find('a').attr('href'));
-					_data.geboren = $(this).find('td').eq(1).text();
-					_data.bundesland = $(this).find('td').eq(3).text();
-
-					dbg( 'fetch.WP () read data for "' + _data.name + '".');
+var abgeordnetenwatchScraper = require('./modules/scrapers/abgeordnetenwatch');
+fetch.agw = abgeordnetenwatchScraper.fetch;
 
 
-					scraper.scrape({
-						url: _data.wp_url, 
-						type: "html",
-						encoding: "utf8"
-					}, function(err, $){
-
-						_count_fetched++;
-
-						if (err) {
-							dbg( 'fetch.WP (' + _data.wp_url + ') ERROR' );
-							console.log(err)
-							_callback(err);
-						} else {
-
-							dbg( 'fetch.WP (' + _data.wp_url + ') OK' );
-
-							// kategorien
-							$('ul li a','#catlinks').each(function(idx,e){
-								switch ($(this).attr("title")) {
-									case "Kategorie:Mann":
-										_data.gender = "m";
-									break;
-									case "Kategorie:Frau":
-										_data.gender = "f";
-									break;
-									case "Kategorie: Intersexueller":
-										_data.gender = "i";
-									break;
-								}
-							});
-							
-							// weblinks
-							$('#Weblinks').parent().next('ul').find('a').each(function(idx,e){
-								_data.links.push({
-									"text": $(this).text(),
-									"url": $(this).attr("href")
-								});
-							});
-							
-							// personendaten meta
-							$('#Vorlage_Personendaten tr').each(function(idx,e){
-								if ($(this).find('.metadata-label').length === 1) {
-									var _val = ($(this).find('.metadata-label').next().text());
-									switch($(this).find('.metadata-label').text()) {
-										case "NAME":
-											_data.aliases.push(_val);
-										break;
-										case "GEBURTSDATUM":
-											_data.geburtsdatum = _val;
-										break;
-										case "GEBURTSORT":
-											_data.geburtsort = _val;
-										break;
-									}
-								}
-							});
-							
-							// bilder?
-							$('a.image', '#mw-content-text').eq(0).each(function(idx,e){
-								if ($(this).attr('href').match(/\.jp(e)?g$/)) {
-									_data.fotos_links.push(url.resolve(_data.wp_url, $(this).attr('href')));
-								}
-							});
-							
-						}
-						
-						data.push(_data);
-
-						if (_count_fetchable === _count_fetched) {
-
-
-							_callback(null, data);
-							return;
-							// TODO: Fotos. Deren Erfolg darf aber nicht die Callbacks verhindern.
-
-							// get fotos from api
-							
-							var _count_fetchable_fotos = 0;
-							var _count_fetched_fotos = 0;
-							data.forEach(function(item){
-								item.fotos_links.forEach(function(foto_url){
-									var _image = foto_url.split(':').pop();
-									_count_fetchable_fotos++;
-									scraper.scrape({
-										url: "http://tools.wmflabs.org/magnus-toolserver/commonsapi.php?image="+_image, 
-										type: "xml",
-										headers: { 'User-Agent': 'bundesscraper/0.2.5 (https://github.com/yetzt/bundesscraper)' }
-									}, function(err, _foto){
-										if (!err) {
-											item.fotos.push({
-												"url": _foto.response.file[0].urls[0].file[0],
-												"copyright": _foto.response.file[0].uploader[0],
-												"license": (typeof _foto.response.licenses[0].license === "undefined") ? foto_url : (typeof _foto.response.licenses[0].license[0].license_text_url === "undefined") ? _foto.response.licenses[0].license[0].name[0] : _foto.response.licenses[0].license[0].license_text_url[0],
-												"source_url": foto_url
-											});
-										}
-										_count_fetched_fotos++;
-										if (_count_fetched_fotos === _count_fetchable_fotos) {
-											_callback(null, data);
-										}
-									});
-								});
-							});
-						}
-					});
-
-				}
-			});
-		}
-	});
-};
-
-fetch.agw = function(_callback){
-	
-	var data = [];
-	var base_url = "http://www.abgeordnetenwatch.de/abgeordnete-1128-0.html";
-	scraper.scrape({
-		url: base_url, 
-		type: "html",
-		encoding: "utf8"
-	}, function(err, $){
-
-		if (err) {
-			_callback(err);
-		} else {
-			
-			var _count_fetched_pages = 0;
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
-
-			var _pages = [];
-			_pages.push(base_url);
-			
-			$('.browse_pages .pages', '#content').eq(0).find('a.ReloadByPageProfiles').each(function(idx,e){
-				_pages.push(url.resolve(base_url, $(this).attr('href').replace(/#.*$/,'')));
-			});
-			
-			var _lastp = parseInt(_pages.pop().replace(/^.*\-0-([0-9]+)\.html$/,"$1"),10);
-			var _pages = [];
-			for (var i = 0; i <= _lastp; i++) {
-				_pages.push(base_url.replace(/0\.html$/, '0-'+i+'.html'))
-			}
-			
-			_pages.forEach(function(page_url){
-
-				scraper.scrape({
-					url: page_url, 
-					type: "html",
-					encoding: "utf8"
-				}, function(err, $){
-
-					_count_fetched_pages++;
-
-					if (err) {
-						// FIXME: unify
-						_callback(err);
-					} else {
-						
-						$('.list .card', '#content').each(function(idx,e){
-
-							_count_fetchable++;
-														
-							var _data = {
-								agw_url: url.resolve(page_url, $(this).find('a').eq(0).attr("href")),
-								name: $(this).find(".title").text(),
-								fotos: [],
-								ausschuesse: []
-							};
-
-							scraper.scrape({
-								url: _data.agw_url, 
-								type: "html", 
-								encoding: "utf8",
-							}, function(err, $){
-
-								_count_fetched++;
-
-								if (err) {
-									// FIXME: whatever
-								} else {
-									
-									// picture
-									$('.portrait .portrait.bordered_left','#content').each(function(idx,e){
-										_data.fotos.push({
-											"url": url.resolve(_data.agw_url, $(this).find('img').eq(0).attr('src')),
-											"copyright": $(this).find('.copyright').text()
-										});
-									});
-
-									// data
-									if ($('.grunddaten ','#content').find(".title_data").eq(0).parent().length === 1) {
-										var _match = $('.grunddaten ','#content').find(".title_data").eq(0).parent().html().match(/<div class="title_data">([^<]+)<\/div>([^<]+)/g);
-										if ((!_match) && argv.v) console.log("[fail]", "data", _data.name, _data.agw_url);
-										if (_match) _match.forEach(function(_m){
-											var __m = _m.match(/^<div class="title_data">([^<]+)<\/div>(.*)/);
-											if (__m) {
-												var __v = __m[2].replace(/^\s+|\s+$/g,'').replace(/<[^>]+>/g,'');
-												switch (__m[1]) {
-													case "Geburtstag": 
-														_data.geburtsdatum = __v;
-													break;
-													case "Berufliche Qualifikation": 
-														_data.beruf = __v;
-													break;
-													case "Wohnort": 
-														_data.wohnort = __v;
-													break;
-													case "Wahlkreis": 
-														_data.wahlkreis = __v;
-													break;
-													case "Ergebnis": 
-														_data.wahlergebnis = __v;
-													break;
-													case "Landeslistenplatz": 
-														_data.listenplatz = __v;
-													break;
-												}
-											}
-										});
-									} else {
-										if (argv.v) console.log("[fail]", _data.name, _data.agw_url);
-									}
-
-									/* abgeordnetenwatch.de is a big pile of junk */
-									/*
-									$(".ausschussmitgliedschaften .entry", "#content").each(function(idx,e){
-										_data.ausschuesse.push({
-											"name": $(this).find('.entry_title a').text(),
-											"funktion": $(this).find('title_data').text(),
-											"url": url.resolve(_data.agw_url, $(this).find('.entry_title a').attr('href'))
-										});
-									});
-									*/
-									
-								}
-								
-								data.push(_data);
-								
-								if (_count_fetched_pages === _pages.length && _count_fetched === _count_fetchable) {
-									// success
-									_callback(null, data);
-								}
-								
-							});
-							
-						});
-						
-					}
-					
-				});
-				
-			});
-			
-		}
-
-	});
-	
-};
 
 fetch.frak_spd = function(_callback){
 
@@ -1427,7 +826,7 @@ var fetch_all = function(_callback) {
 	};
 	
 	//["bt","wp","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
-	["wp"].forEach(function(_fetch){		
+	["bt"].forEach(function(_fetch){		
 		if (argv.v) console.log('[init]'.magenta.inverse.bold, "scraper".cyan, _fetch.white);
 		
 		fetch[_fetch](function(err, data){
@@ -1628,7 +1027,7 @@ var data_unify = function(_data, _callback){
 				wahlkreis_name: null,
 				bundesland: null,
 				mandat: item.data.bt.mandat,
-				liste: null,
+				liste: item.data.bt.landesliste,
 				listenplatz: null,
 				ergebnis: null
 			},
@@ -1954,11 +1353,6 @@ var load_data = function(_callback) {
 	}
 }
 
-
-var dbg = function( msg ) {
-	console.log( ('[debug] ' + msg).yellow );
-}
-
 var main = function(){
 	dbg('main()');
 	load_data(function(err, data){
@@ -1970,6 +1364,7 @@ var main = function(){
 		}
 
 		if (argv.v) console.log('[stat]'.magenta.inverse.bold, "all data loaded".white);
+
 		data_combine(data, function(err, data){
 			data_unify(data, function(err, data){
 				if (argv.v) console.log('[stat]'.magenta.inverse.bold, "all data combined".white);
@@ -1978,6 +1373,12 @@ var main = function(){
 				if (argv.t) out_file = "bundesscraper."+moment().format("YYYY-MM-DD")+".json";
 				if (argv.z) out_file += ".xz";
 				out_file = path.resolve((argv.o || __dirname), out_file);
+
+				// TODO: fix this, make the path relative
+				var out_file = "/var/www/bundesscraper/bundesscraper_" + moment().format("YYYY-MM-DD") + ".json";
+				fs.writeFileSync(out_file, JSON.stringify(data, null, '\t'));
+				console.log('[save]'.magenta.inverse.bold, path.basename(out_file).white);
+				process.exit();
 
 /* DISABLE I/O
 				if (argv.z) {
