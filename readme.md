@@ -4,7 +4,7 @@ Scraping Data of Members of the German Federal Parliament.
 
 ## Current Status: 
 
-Note: This fork is under development/WIP, as I am adapting it to my needs of bundestwitter.de. It works basically, but expect  code to be commented out, paths to be hardcoded and heavy console outout.
+Note: This fork is under development/WIP, as I am adapting it to my needs of bundestwitter.de. It works basically, but expect code to be commented out, paths to be hardcoded and heavy console outout.
 
 
 ## About
@@ -12,7 +12,7 @@ Note: This fork is under development/WIP, as I am adapting it to my needs of bun
 Bundesscraper collects data of German Parliament members from several Websites and combines them. The data is collected from
 
 * [bundestag.de](http://www.bundestag.de/)
-* [de.wikiepdia.org](http://de.wikiepdia.org/)
+* [de.wikipedia.org](http://de.wikipedia.org/)
 * [abgeordnetenwatch.de](http://www.abgeordnetenwatch.de/)
 * [spdfraktion.de](http://www.spdfraktion.de/)
 * [gruene-bundestag.de](http://www.gruene-bundestag.de/)
@@ -31,6 +31,14 @@ npm -g install bundesscraper
 ````
 bundesscraper [-c] [-v] [-d] [data.json]
 ````
+
+In case the complete/latest project is not installed globally, you can run a local ile:
+
+````
+node bundesscraper.js bundesscraper_2016-04-08.json
+````
+
+
 
 * `-c` `--cache` turn on caching, creates cache.json with unprocessed data
 * `-v` `--verbose` show a lot of information

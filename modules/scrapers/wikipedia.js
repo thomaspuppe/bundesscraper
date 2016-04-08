@@ -35,7 +35,7 @@ module.exports = {
 
 fetch: function(_callback){
 	
-		console.log( 'fetch.WP () Start' );
+		console.log( 'fetch.Wikipedia () Start' );
 
 		var data = [];
 		var base_url = "http://de.wikipedia.org/wiki/Liste_der_Mitglieder_des_Deutschen_Bundestages_%2818._Wahlperiode%29";
@@ -46,12 +46,12 @@ fetch: function(_callback){
 		}, function(err, $){
 
 			if (err) {
-				dbg( 'fetch.WP () ERROR' );
+				dbg( 'fetch.Wikipedia () ERROR' );
 				console.log( error );
 				_callback(err);
 			} else {
 
-				dbg( 'fetch.WP () OK' );
+				dbg( 'fetch.Wikipedia () OK' );
 
 				var _count_fetchable = 0;
 				var _count_fetched = 0;
@@ -59,9 +59,9 @@ fetch: function(_callback){
 				var data = [];
 				
 				var allRows = $('#Abgeordnete').parent().next().next('table.prettytable.sortable').find('tr');
-				dbg( 'fetch.WP () found ' + allRows.length + ' rows.');
+				dbg( 'fetch.Wikipedia () found ' + allRows.length + ' rows.');
 
-				allRows = allRows.slice(0,5);
+				//allRows = allRows.slice(0,5);
 
 				allRows.each(function(idx,e){
 
@@ -72,6 +72,7 @@ fetch: function(_callback){
 						_count_fetchable++;
 						
 						var _data = {
+							"name": null,
 							"gender": "u",
 							"links": [],
 							"aliases": [],
@@ -82,17 +83,14 @@ fetch: function(_callback){
 						};
 						_data.name = $(this).find('td').eq(0).find('a').text();
 
-// url kennt er ja auch nicht hier. Das Reinreichen kann nicht der Weg sein.
-
-						_data.wp_url = url.resolve(base_url, $(this).find('td').eq(0).find('a').attr('href'));
+						_data.wikipedia_url = url.resolve(base_url, $(this).find('td').eq(0).find('a').attr('href'));
 						_data.geboren = $(this).find('td').eq(1).text();
 						_data.bundesland = $(this).find('td').eq(3).text();
 
-						dbg( 'fetch.WP () read data for "' + _data.name + '".');
-
+						dbg( 'fetch.Wikipedia () read data for "' + _data.name + '".');
 
 						scraper.scrape({
-							url: _data.wp_url, 
+							url: _data.wikipedia_url, 
 							type: "html",
 							encoding: "utf8"
 						}, function(err, $){
@@ -100,12 +98,12 @@ fetch: function(_callback){
 							_count_fetched++;
 
 							if (err) {
-								dbg( 'fetch.WP (' + _data.wp_url + ') ERROR' );
+								dbg( 'fetch.Wikipedia (' + _data.wikipedia_url + ') ERROR' );
 								console.log(err)
 								_callback(err);
 							} else {
 
-								dbg( 'fetch.WP (' + _data.wp_url + ') OK' );
+								dbg( 'fetch.Wikipedia (' + _data.wikipedia_url + ') OK' );
 
 								// kategorien
 								$('ul li a','#catlinks').each(function(idx,e){
@@ -151,7 +149,7 @@ fetch: function(_callback){
 								// bilder?
 								$('a.image', '#mw-content-text').eq(0).each(function(idx,e){
 									if ($(this).attr('href').match(/\.jp(e)?g$/)) {
-										_data.fotos_links.push(url.resolve(_data.wp_url, $(this).attr('href')));
+										_data.fotos_links.push(url.resolve(_data.wikipedia_url, $(this).attr('href')));
 									}
 								});
 								

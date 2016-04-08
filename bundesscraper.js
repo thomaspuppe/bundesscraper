@@ -107,708 +107,15 @@ var bundestagScraper = require('./modules/scrapers/bundestag');
 fetch.bt = bundestagScraper.fetch;
 
 var wikipediaScraper = require('./modules/scrapers/wikipedia');
-fetch.wp = wikipediaScraper.fetch;
+fetch.wikipedia = wikipediaScraper.fetch;
 
 var abgeordnetenwatchScraper = require('./modules/scrapers/abgeordnetenwatch');
 fetch.agw = abgeordnetenwatchScraper.fetch;
 
-
-
-fetch.frak_spd = function(_callback){
-
-	var data = [];
-	var base_url = "http://www.spdfraktion.de/abgeordnete/all?view=list";
-
-	scraper.scrape({
-		url: base_url,
-		type: "html",
-		encoding: "utf8"
-	}, function(err, $){
-
-		if (err) {
-			_callback(err);
-		} else {
-			
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
-
-			$('#member_overview_list > li', '#member_overview').each(function(idx,e){
-				
-				_count_fetchable++;
-
-				var _data = {
-					name: $(this).find('h3 a').text(),
-					frak_url: url.resolve(base_url, $(this).find('h3 a').attr('href')),
-					fotos: [],
-					kontakt: [],
-					web: []
-				};
-				
-				if ($(this).find('a.mail').length > 0) {
-					$(this).find('a.mail').each(function(idx,e){
-						_data.kontakt.push({
-							"type": "email",
-							"address": $(this).attr('href').replace(/^mailto:/,'')
-						})
-					});
-				}
-				
-				$(this).find('.share li a').each(function(idx,f){
-					_data.web.push({
-						service: $(f).text(),
-						url: $(f).attr("href")
-					});
-				});
-				
-				// get details
-				
-				scraper.scrape({
-					url: _data.frak_url, 
-					type: "html", 
-					encoding: "utf8",
-				}, function(err, $){
-					
-					_count_fetched++;
-					
-					if (err) {
-						
-						
-					} else {
-						
-						$('.subcr dl dt','#article_detail_header').each(function(idx,e){
-							var _val = $(this).next('dd').text();
-							switch ($(this).text()) {
-								case "Geburtsdatum": 
-									_data.geburtsdatum = _val.split(' in ').unshift(); 
-									_data.geburtsort = _val.split(' in ').pop(); 
-								break;
-								case "Beruf:": _data.beruf = _val; break;
-								case "Landesliste:": _data.liste = _val; break;
-								case "Wahlkreis:": _data.wahlkreis = _val; break;
-							}
-						});
-
-						// links
-						
-						$('.linklist li a','#article_detail_header').each(function(idx,e){
-							switch($(this).text()) {
-								case "Porträt auf bundestag.de": var _type = "bundestag"; break;
-								case "YouTube": var _type = "youtube"; break;
-								case "Reden im Videoarchiv des Bundestags": var _type = "bundestag_reden"; break;
-								case "Auf twitter": var _type = "twitter"; break;
-								case "Auf facebook": var _type = "facebook"; break;
-								default:
-									if ($(this).text().match(/^Homepage/i)) {
-										var _type = "website";
-									} else {
-										var _type = "unknown";
-									}
-								break;
-							}
-							if ($(this).attr('href') !== '') {
-								_data.web.push({
-									"service": _type,
-									"url": $(this).attr('href')
-								});
-							}
-						});
-						
-						// foto
-						$('.img_wrapper','#article_detail_header').each(function(idx,e){
-							_data.fotos.push({
-								"url": url.resolve(_data.frak_url, $(this).attr("href")),
-								"copyright": ""
-							});
-						});
-
-						// kontakt
-						$('.map_box_content li', '#main').each(function(idx,e){
-							
-							var _name = $(this).find('h3').text();
-							
-							$(this).find('div span').each(function(idx,f){
-								if ($(f).text().match(/^(Tel|Fax)/)) {
-									// telefon | fax
-									$(f).text().split(' | ').forEach(function(t){
-										if (t.match(/^Tel/)){
-											_data.kontakt.push({
-												"type": "phone",
-												"name": _name,
-												"address": t.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-											});
-										}
-										if (t.match(/^Fax/)){
-											_data.kontakt.push({
-												"type": "fax",
-												"name": _name,
-												"address": t.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-											});
-										}
-									});
-								} else {
-									_data.kontakt.push({
-										"type": "address",
-										"name": _name,
-										"address": $(f).text().replace(" | ",", ")
-									});
-								}
-							});
-							$(this).find('div a').each(function(idx,f){
-								if ($(f).text().match(/E-Mail/)) {
-									_data.kontakt.push({
-										"type": "email",
-										"name": _name,
-										"address": $(f).attr('href').replace(/^mailto:/,'')
-									});
-								}
-							});
-						});
-					}
-					
-					data.push(_data);
-					
-					if (_count_fetchable === _count_fetched) {
-						
-						_callback(null, data);
-						
-					}
-					
-				});
-				
-			});
-
-		}
-		
-	});
-	
-};
-
-fetch.frak_gruene = function(_callback){
-
-	var data = [];
-	var base_url = "http://www.gruene-bundestag.de/";
-	var fetch_url = "http://www.gruene-bundestag.de/fraktion/abgeordnete_ID_4389869.html";
-
-	scraper.scrape({
-		url: fetch_url, 
-		type: "html",
-		encoding: "utf8"
-	}, function(err, $){
-
-		if (err) {
-			_callback(err);
-		} else {
-			
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
-			
-			$('.tt_content_list_item','#abgeordnete_slides_container').each(function(idx,e){
-				
-				_count_fetchable++;
-				
-				var _data = {
-					name: $(this).find('.abgeordnete_text p').eq(0).find('a').text(),
-					frak_url: url.resolve(base_url, $(this).find('.abgeordnete_text p').eq(0).find('a').attr("href")),
-					fotos: [{
-						"url": url.resolve(base_url, $(this).find('img').eq(0).attr("src")),
-						"copyright": null
-					}],
-					web: [],
-					kontakt: []
-				}
-				
-				$(this).find('.email_link a').each(function(idx,e){
-					_data.kontakt.push({
-						"type": "email",
-						"address": $(this).attr('href').replace(/^mailto:/,'')
-					})
-				})
-				
-				scraper.scrape({
-					url: _data.frak_url, 
-					type: "html",
-					encoding: "utf8"
-				}, function(err, $){
-					
-					_count_fetched++;
-					
-					if (err) {
-						// FIXME: err
-					} else {
-						
-						// email, telefon & fax
-						$('p.bodytext', '#abgeordnete_links').each(function(idx,e){
-							if ($(this).find('a.mailtolink').length !== 0) {
-								/* email */
-								_data.kontakt.push({
-									"type": "email",
-									"name": "Berliner Büro",
-									"address": $(this).find('a.mailtolink').attr("href").replace(/^mailto:/,'')
-								});
-							} else if ($(this).find('b').length !== 0) {
-								// skip
-							} else {
-								/* telefon fax */
-								$(this).html().split('<br>').forEach(function(itm){
-									itm = itm.replace(/^\s+|\s+$/g,'');
-									switch(itm.substr(0,1)) {
-										case "T":
-											_data.kontakt.push({
-												"type": "phone",
-												"name": "Berliner Büro",
-												"address": itm.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-											});
-										break;
-										case "F":
-										_data.kontakt.push({
-											"type": "fax",
-											"name": "Berliner Büro",
-											"address": itm.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-										});
-										break;
-									}
-								});
-							}
-						});
-						
-						// links 
-						$('li a','#links').each(function(idx,e){
-							switch($(this).text().toLowerCase().replace(/[^a-z]/g,'')){
-								case "twitter":
-									_data.web.push({
-										"service": "twitter",
-										"url": $(this).attr('href')
-									});
-								break;
-								case "facebook":
-									_data.web.push({
-										"service": "facebook",
-										"url": $(this).attr('href')
-									});
-								break;
-								case "blog":
-									_data.web.push({
-										"service": "blog",
-										"url": $(this).attr('href')
-									});
-								break;
-								case "youtube":
-									_data.web.push({
-										"service": "youtube",
-										"url": $(this).attr('href')
-									});
-								break;
-								case "portrtbeibundestagde":
-									_data.web.push({
-										"service": "bundestag",
-										"url": $(this).attr('href')
-									});
-								break;
-								case "verffentlichungspflichtigeangaben": break;
-								default: 
-									if ($(this).attr('href').toLowerCase().indexOf($(this).text().toLowerCase()) >= 0) {
-										// personal website
-										_data.web.push({
-											"service": "website",
-											"url": $(this).attr('href')
-										});
-									} else {
-										_data.web.push({
-											"service": "unknown",
-											"url": $(this).attr('href')
-										});
-									}
-								break;
-							}
-						});
-						
-						/* wahlkreis */
-						$('.wk-info h4 a','#parlament').each(function(idx,e){
-							_data.wahlkreis = $(this).text();
-						});
-						
-						/* guessing arbritrary address formats */
-						$('.wk-kontakt .bodytext','#parlament').each(function(idx,e){
-
-							var _lines = [];
-							$(this).html().split('<br>').forEach(function(_line){
-								_lines.push(_line.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,''));
-							});
-														
-							_lines.forEach(function(_line,idx){
-								_line = _line.replace('&nbsp;',' ');
-								if (_line.match(/^T. /)) {
-									/* phone */
-									_data.kontakt.push({
-										"type": "phone",
-										"name": "Wahlkreisbüro",
-										"address": _line.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-									});
-								} else if (_line.match(/^F. /)) {
-									/* fax */
-									_data.kontakt.push({
-										"type": "fax",
-										"name": "Wahlkreisbüro",
-										"address": _line.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-									});
-								} else if (_line.match(/^0[0-9]+[0-9\/ ]+$/)) {
-									/* phone */
-									_data.kontakt.push({
-										"type": "phone",
-										"name": "Wahlkreisbüro",
-										"address": _line.replace(/[^0-9]/g,'').replace(/^0/,'+49')
-									});
-								} else if (_line.match(/^(D-)?[0-9]{5} [^0-9]+$/i)) {
-									/* address */
-									_data.kontakt.push({
-										"type": "address",
-										"name": "Wahlkreisbüro",
-										"address": (_lines[idx-1]+', '+_line)
-									});
-								} else if (_line.match(/\(at\)|@/i)) {
-									/* email */
-									_data.kontakt.push({
-										"type": "email",
-										"name": "Wahlkreisbüro",
-										"address": _line.replace(/\s*\(at\)\s*/,'@')
-									});
-								} 
-								
-							});
-							
-						});
-						
-					}
-					
-					data.push(_data);
-					
-					if (_count_fetchable === _count_fetched) {
-						
-						_callback(null, data);
-						
-					}
-					
-				});
-				
-			});
-
-		}
-		
-	});
-	
-};
-
-fetch.frak_linke = function(_callback){
-
-	var data = [];
-	var base_url = "http://www.linksfraktion.de/abgeordnete/";
-
-	scraper.scrape({
-		url: base_url, 
-		type: "html", 
-		encoding: "utf8"
-	}, function(err, $){
-
-		if (err) {
-			_callback(err);
-		} else {
-			
-			var _count_fetchable = 0;
-			var _count_fetched = 0;
-
-			$('.listenElement','#layoutHaupt').each(function(idx,e){
-				
-				_count_fetchable++;
-				
-				var _data = {
-					name: $(this).find('a').eq(0).attr('title'),
-					frak_url: url.resolve(base_url, $(this).find('a').eq(0).attr('href')),
-					fotos: [{
-						"url": $(this).find('img').attr('src'),
-						"copyright": null
-					}],
-					web: [],
-					kontakt: []
-				}
-				
-				scraper.scrape({
-					url: _data.frak_url.replace(/profil\/$/,'kontakt/'), 
-					type: "html", 
-					encoding: "utf8"
-				}, function(err, $){
-				
-					_count_fetched++;
-				
-					if (err) {
-						
-						// err
-						
-					} else {
-						
-						$('.kontakt', '#spalte1').each(function(idx,e){
-						
-							var _name = $(this).find("[itemprop=name]").text();
-						
-							$(this).find("[itemprop=address]").each(function(idx,f){
-							
-								_data.kontakt.push({
-									"type": "address",
-									"name": _name,
-									"address": $(f).find("[itemprop=street-address]").text()+', '+$(f).find("[itemprop=postal-code]").text()+' '+$(f).find("[itemprop=locality]").text()
-								});
-							
-							});
-						
-							$(this).find("[itemprop=tel]").each(function(idx,f){
-								_data.kontakt.push({
-									"type": "phone",
-									"name": _name,
-									"address": $(f).text().replace(/[^0-9]/g,'').replace(/^0/,'+49')
-								});
-							});
-						
-							$(this).find("[itemprop=fax]").each(function(idx,f){
-								_data.kontakt.push({
-									"type": "fax",
-									"name": _name,
-									"address": $(f).text().replace(/[^0-9]/g,'').replace(/^0/,'+49')
-								});
-							});
-
-							$(this).find("a.linkEmail").each(function(idx,f){
-								_data.kontakt.push({
-									"type": "email",
-									"name": _name,
-									"address": $(f).attr('href').replace(/^mailto:/g,'')
-								});
-							});
-						
-						});
-					
-						$('.inhaltElement.elemTeaser.extern', '#spalte2').each(function(idx,e){
-							if ($(this).find('h3.kennung').length === 1 && $(this).find('h3.kennung').text() === "Linktipp") {
-								_data.web.push({
-									"service": "website",
-									"url": $(this).find('a.extern').attr('href')
-								});
-							}
-						});
-					
-					}
-					
-					data.push(_data);
-					
-					if (_count_fetchable === _count_fetched) {
-						
-						_callback(null, data);
-						
-					}
-		
-				});
-				
-			});
-
-		}
-		
-	});
-	
-};
-
-fetch.frak_cducsu = function(_callback){
-
-	var data = [];
-	var base_url = "https://www.cducsu.de/abgeordnete";
-	var _count_fetchable = 0;
-	var _count_fetched = 0;
-
-	scraper.scrape({
-		url: base_url, 
-		type: "html", 
-		encoding: "utf8"
-	}, function(err, $){
-		
-		if (err) return _callback(new Error("could not fetch", base_url));
-		
-		$('.abgeordnete_az_content .node-abgeordneter a.abgeordnete_wrapper_link', '#block-system-main').each(function(idx,e){
-
-			_count_fetchable++;
-
-			(function(_url){
-
-				scraper.scrape({
-					"url": _url, 
-					type: "html", 
-					encoding: "utf8"
-				}, function(err, $){
-
-					var _data = {
-						name: $('.group-hauptinfo .group-infobereich h1', '#block-system-main').text().replace(/^\s+|\s+$/g,''),
-						frak_url: _url,
-						fotos: [],
-						web: [],
-						kontakt: []
-					}
-					
-					_data.position = $('.group-hauptinfo .group-infobereich h3', '#block-system-main').text().replace(/^\s+|\s+$/g,'');
-					_data.geburtsdatum = $('.group-hauptinfo .group-infobereich .group-birthday time.date-display-single', '#block-system-main').attr("datetype");
-					_data.geburtsort = ent.decode($('.group-hauptinfo .group-infobereich .group-birthday').html().split(/<\/div>/g).pop().replace(/^\s+|\s+$/g,''));
-					_data.beruf = $('.group-hauptinfo .group-infobereich .field.field-name-beruf-gendered', '#block-system-main').text().replace(/^\s+|\s+$/g,'');
-					
-					/* wahlkreis, addressen, social media, */
-					if (/^.*Wahlkreis.*\(([0-9]+)\).*$/.test($('.wahlkreis-name', '#block-system-main').text())) {
-						_data.wahlkreis = $('.wahlkreis-name', '#block-system-main').text().replace(/^.*Wahlkreis.*\(([0-9]+)\).*$/,'$1');
-						_data.mandat = "direkt";
-					} else {
-						_data.mandat = "liste";
-					}
-
-					// addresse berlin
-					$('.field-name-field-kontakt-berlin .adr', '#block-system-main').each(function(idx, e){
-						$('.type', $(this)).remove();
-
-						$('.tel', $(this)).each(function(idx,e){
-							_data.kontakt.push({
-								"type": "phone",
-								"name": "Berlin",
-								"address": $(this).text().replace(/^\s+|\s+$/g,'').replace(/[^0-9]/g,'').replace(/^0/,'+49')
-							});
-						});
-
-						$('.email', $(this)).each(function(idx,e){
-							_data.kontakt.push({
-								"type": "email",
-								"name": "Berlin",
-								"address": $(this).text().replace(/^\s+|\s+$/g,'')
-							});
-						});
-
-						_data.kontakt.push({
-							"type": "address",
-							"name": "Berlin",
-							"address": [
-								$(".street-address", $(this)).text().replace(/^\s+|\s+$/g,''),
-								", ",
-								$(".postal-code", $(this)).text().replace(/^\s+|\s+$/g,''),
-								" ",
-								$(".locality", $(this)).text().replace(/^\s+|\s+$/g,'')
-							].join("")
-						});
-
-					});
-					
-					// addresse wahlkreis
-					$('.group-wahl-wrapper .adr', '#block-system-main').each(function(idx, e){
-						$('.type', $(this)).remove();
-
-						$('.tel', $(this)).each(function(idx,e){
-							_data.kontakt.push({
-								"type": "phone",
-								"name": "Wahlkreis",
-								"address": $(this).text().replace(/^\s+|\s+$/g,'').replace(/[^0-9]/g,'').replace(/^0/,'+49')
-							});
-						});
-
-						$('.email', $(this)).each(function(idx,e){
-							_data.kontakt.push({
-								"type": "email",
-								"name": "Wahlkreis",
-								"address": $(this).text().replace(/^\s+|\s+$/g,'')
-							});
-						});
-
-						_data.kontakt.push({
-							"type": "address",
-							"name": "Wahlkreis",
-							"address": [
-								$(".street-address", $(this)).text().replace(/^\s+|\s+$/g,''),
-								", ",
-								$(".postal-code", $(this)).text().replace(/^\s+|\s+$/g,''),
-								" ",
-								$(".locality", $(this)).text().replace(/^\s+|\s+$/g,'')
-							].join("")
-						});
-
-					});
-					
-					// social media
-					
-					$('.view.view-abgeordneter-sozialnetzwerke li', '#block-system-main').each(function(idx, e){
-						switch ($(this).attr("class")) {
-							case "twitter":
-								_data.web.push({
-									"service": "twitter",
-									"url": $('a', $(this)).attr('href')
-								});
-							break;
-							case "facebook":
-								_data.web.push({
-									"service": "facebook",
-									"url": $('a', $(this)).attr('href')
-								});
-							break;
-							case "xing":
-								_data.web.push({
-									"service": "xing",
-									"url": $('a', $(this)).attr('href')
-								});
-							break;
-							case "youtube":
-								_data.web.push({
-									"service": "youtube",
-									"url": $('a', $(this)).attr('href')
-								});
-							break;
-							case "vz":
-								_data.web.push({
-									"service": "meinvz",
-									"url": $('a', $(this)).attr('href')
-								});
-							break;
-							default:
-								dbg('OUTPUT DEFAULT HTML Fallback')
-								console.log($(this).attr("class"), $(this).html());
-								process.exit();
-							break;
-						}
-					});
-					
-					// links
-					$('.view-externe-links li', '#block-system-main').remove(".mobile_visible");
-					$('.view-externe-links li a', '#block-system-main').each(function(idx, e){
-
-						switch ($(this).text().replace(/^\s+|\s+$/g,'')) {
-							case "Persönliche Homepage":
-								_data.web.push({
-									"service": "website",
-									"url": $(this).attr('href')
-								});
-							break;
-						}
-					});
-										
-					// foto
-					$('.abgeordnete_content_box .file-image', '#block-system-main').each(function(idx,e){
-						$('.group-bildquelle', $(this)).remove('.label-inline')
-						_data.fotos.push({
-							"url": url.resolve(_url, $('a.colorbox', $(this)).attr('href')),
-							"copyright": $('.group-bildquelle', $(this)).text().replace(/^\s+|\s+$/g,''),
-							"license": $('a[rel=license]', $(this)).attr("href") || null
-						});
-					});
-
-					data.push(_data);
-					if (++_count_fetched === _count_fetchable) _callback(null, data);
-					
-					
-				});
-
-			})(url.resolve(base_url, $(this).attr("href")))
-			
-		});
-
-	});
-
-}
+// x_spd
+// x_gruene
+// x_linke
+// x_cducsu
 
 var fetch_all = function(_callback) {
 
@@ -817,7 +124,7 @@ var fetch_all = function(_callback) {
 	var _passed = 0;
 	var _data = {
 		bt: null,
-		wp: null,
+		wikipedia: null,
 		agw: null,
 		frak_spd: null,
 		frak_gruene: null,
@@ -825,8 +132,8 @@ var fetch_all = function(_callback) {
 		frak_cducsu: null
 	};
 	
-	//["bt","wp","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
-	["bt"].forEach(function(_fetch){		
+	//["bt","wikipedia","agw","frak_spd","frak_gruene","frak_linke","frak_cducsu"].forEach(function(_fetch){
+	["bt","wikipedia"].forEach(function(_fetch){		
 		if (argv.v) console.log('[init]'.magenta.inverse.bold, "scraper".cyan, _fetch.white);
 		
 		fetch[_fetch](function(err, data){
@@ -835,12 +142,11 @@ var fetch_all = function(_callback) {
 			if (!err) {
 				_data[_fetch] = data;
 				dbg('fetch_' + _fetch + 'callback ( SUCCESS ):');
-				//console.log(_data);
 			} else {
 				dbg('fetch_' + _fetch + 'callback ( ERROR )');
 			}
 			//if (_passed === 7) _callback(null, _data);
-			if (_passed === 1) _callback(null, _data);
+			if (_passed === 2) _callback(null, _data);
 		});
 		
 	});
@@ -909,17 +215,29 @@ var data_combine = function(_data, _callback){
 	}
 
 	/* find wikipedia */
-	if (_data.wp) {
-		for (var i = 0; i < _data.wp.length; i++) {
+	if (_data.wikipedia) {
+		dbg('combine data: Wikipedia ' + _data.wikipedia.length);
+		for (var i = 0; i < _data.wikipedia.length; i++) {
+			dbg('comparison in: ' + i);
 			var _found = false;
 			for (var j = 0; j < data.length; j++) {
-				if ((data[j].compare.name.indexOf(_data.wp[i].name) >= 0) || (data[j].compare.name.indexOf(name_translations[_data.wp[i].name]) >= 0)) {
+
+				var name_from_data = data[j].compare.name,
+					name_from_wikipedia = _data.wikipedia[i].name,
+					name_from_translation = name_translations[name_from_wikipedia];
+
+				//dbg('comparison try (' + j + ') ' + name_from_data + ' | ' + name_from_wikipedia + ' | ' + name_from_translation);
+
+				if ((name_from_data.indexOf(name_from_wikipedia) >= 0) || (name_from_data.indexOf(name_from_translation) >= 0)) {
+					//dbg('comparison OK');
 					var _found = true;
-					data[j].data.wp = _data.wp[i];
+					data[j].data.wikipedia = _data.wikipedia[i];
 					break;
+				} else {
+					//dbg('comparison FAILED')
 				}
 			}
-			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _data.wp[i].name.white, '(Wikipedia)'.cyan);
+			if (!_found && argv.v) console.log("[warn]".inverse.bold.yellow, "Not found:".yellow, _data.wikipedia[i].name.white, '(Wikipedia)'.cyan);
 		}
 		//console.log(_data)
 	}
@@ -1093,24 +411,24 @@ var data_unify = function(_data, _callback){
 		}
 
 		/* wikipedia */
-		if (item.data.hasOwnProperty("wp")) {
+		if (item.data.hasOwnProperty("wikipedia")) {
 
 			/* name */
-			if (_data.aliases.indexOf(item.data.wp.name) < 0) _data.aliases.push(item.data.wp.name);
+			if (_data.aliases.indexOf(item.data.wikipedia.name) < 0) _data.aliases.push(item.data.wikipedia.name);
 
 			/* fotos */
-			item.data.wp.fotos.forEach(function(foto){
+			item.data.wikipedia.fotos.forEach(function(foto){
 				_data.fotos.push(foto);
 			});
 
 			/* url */
 			_data.web.push({
 				service: "wikipedia",
-				url: item.data.wp.wp_url
+				url: item.data.wikipedia.wikipedia_url
 			});
 		
 			/* links */
-			item.data.wp.links.forEach(function(link){
+			item.data.wikipedia.links.forEach(function(link){
 				var _url = url.parse(link.url);
 				if ("hostname" in _url) {
 					if (link.url.match(/^http:\/\/(www\.)?bundestag\.de\/bundestag\/abgeordnete17\/biografien\//)) {
@@ -1136,20 +454,20 @@ var data_unify = function(_data, _callback){
 			});
 			
 			/* geschlecht */
-			if (typeof item.data.wp.gender !== "undefined") {
-				_data.meta.geschlecht = item.data.wp.gender;
+			if (typeof item.data.wikipedia.gender !== "undefined") {
+				_data.meta.geschlecht = item.data.wikipedia.gender;
 			}
 			
-			if (_data.meta.geburtsort === null && item.data.wp.geburtsort !== null) {
-				_data.meta.geburtsort = item.data.wp.geburtsort;
+			if (_data.meta.geburtsort === null && item.data.wikipedia.geburtsort !== null) {
+				_data.meta.geburtsort = item.data.wikipedia.geburtsort;
 			}
 
-			if (_data.meta.geburtsdatum === null && item.data.wp.geburtsdatum !== null) {
-				_data.meta.geburtsdatum = moment(item.data.wp.geburtsdatum, 'D. MMMM YYYY').format("YYYY-MM-DD");
+			if (_data.meta.geburtsdatum === null && item.data.wikipedia.geburtsdatum !== null) {
+				_data.meta.geburtsdatum = moment(item.data.wikipedia.geburtsdatum, 'D. MMMM YYYY').format("YYYY-MM-DD");
 			}
 
-			if (_data.wahl.bundesland === null && item.data.wp.bundesland !== null) {
-				_data.wahl.bundesland = item.data.wp.bundesland;
+			if (_data.wahl.bundesland === null && item.data.wikipedia.bundesland !== null) {
+				_data.wahl.bundesland = item.data.wikipedia.bundesland;
 			}
 		
 		} else {
