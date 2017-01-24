@@ -47,3 +47,10 @@ node bundesscraper.js bundesscraper_2016-04-08.json
 ## License
 
 Bundesscraper is [Public Domain](./license.md).
+
+
+## TODO: Add Sources
+
+### Bundesfeeds, Wikidata
+
+Bundesfeeds https://bundesfeeds.github.io/liste.html verlinkt eine Wikidata-Liste: https://docs.google.com/spreadsheets/d/1a1ETdLybypLHrR4GC4aap_3Cr5StIsX-hPAHiq9_hGM/edit#gid=0 . Und dort bei Wikidata (https://www.wikidata.org/wiki/Q2372488) stehen dann Twitter-Handle und Facebook-Id.
