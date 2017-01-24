@@ -54,3 +54,7 @@ Bundesscraper is [Public Domain](./license.md).
 ### Bundesfeeds, Wikidata
 
 Bundesfeeds https://bundesfeeds.github.io/liste.html verlinkt eine Wikidata-Liste: https://docs.google.com/spreadsheets/d/1a1ETdLybypLHrR4GC4aap_3Cr5StIsX-hPAHiq9_hGM/edit#gid=0 . Und dort bei Wikidata (https://www.wikidata.org/wiki/Q2372488) stehen dann Twitter-Handle und Facebook-Id.
+
+### Everypolitician
+
+http://everypolitician.org/germany/bundestag/download.html, https://cdn.rawgit.com/everypolitician/everypolitician-data/1395c5973b01ed59bcd672d9b3988b1479f2c933/data/Germany/Bundestag/ep-popolo-v1.0.json
